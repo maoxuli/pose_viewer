@@ -30,6 +30,18 @@ pose_viewer::pose_viewer(int* argc, char** argv)
   pose_viewer::instance = this; 
   glutInit(argc, argv);
 
+  std::unique_lock<std::mutex> lock(_gl_mutex); 
+  glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+  glutInitWindowSize(500, 500);
+  glutInitWindowPosition(0, 0);
+  glutCreateWindow("Pose Viewer");
+  glutReshapeFunc(pose_viewer::reshape_callback); 
+  glutDisplayFunc(pose_viewer::display_callback); 
+  glEnable(GL_DEPTH_TEST);
+  _gl_inited = true; 
+  lock.unlock(); 
+  printf("gl main loop...\n"); 
+  
   printf("Start gl thread\n"); 
   _gl_inited = false; 
   _gl_thread = std::thread(std::bind(&pose_viewer::gl_thread, this));
@@ -79,7 +91,9 @@ void pose_viewer::update_orientation(double qw, double qx, double qy, double qz)
 void pose_viewer::update_display() 
 {
   std::unique_lock<std::mutex> lock(_gl_mutex); 
-  glutPostRedisplay();
+  if (_gl_inited) {
+    glutPostRedisplay();
+  }
 }
 
 void pose_viewer::display()
@@ -159,17 +173,6 @@ void pose_viewer::reshape(int w, int h)
 void pose_viewer::gl_thread() 
 {
   printf("gl thread in\n"); 
-  std::unique_lock<std::mutex> lock(_gl_mutex); 
-  glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
-  glutInitWindowSize(500, 500);
-  glutInitWindowPosition(0, 0);
-  glutCreateWindow("Pose Viewer");
-  glutReshapeFunc(pose_viewer::reshape_callback); 
-  glutDisplayFunc(pose_viewer::display_callback); 
-  glEnable(GL_DEPTH_TEST);
-  _gl_inited = true; 
-  lock.unlock(); 
-  printf("gl main loop...\n"); 
   glutMainLoop();
   printf("gl thread out\n"); 
 }

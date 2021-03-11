@@ -12,8 +12,9 @@ using namespace std::chrono;
 #include <Eigen/Eigen>
 using namespace Eigen;
 
-#include "pose_ekf.h"
-#include "pose_viewer.h"
+#include "gl_cuboid.h"
+// #include "pose_ekf.h"
+#include "MadgwichAHRS.h"
 
 struct IMU_LINE 
 {
@@ -157,40 +158,51 @@ void loadCSV(const std::string& fname)
 
 int main(int argc, char *argv[])
 {
-  // loadIMU("imu.txt"); 
-  loadCSV("test.csv"); 
+  loadIMU("imu.txt"); 
+  // loadCSV("test.csv"); 
 
-  pose_viewer viewer(&argc, argv); 
-  pose_ekf pose;
+  GlCuboid viewer(&argc, argv); 
+  // pose_viewer viewer(&argc, argv); 
+  // pose_ekf pose;
+  MadgwichAHRS ahrs(1/256.0); 
 
   double time = 0; 
-  double dt = 0.1; 
+  double dt = 0.01; 
   while (true) {
     IMU_LINE& imu = imu_data[current_line]; 
 
-    if (pose.is_init_done == false) {
-      Vector3d pos = Vector3d::Zero();
-      Vector3d vel = Vector3d::Zero();
-      pose.pose_init(pos, vel);
-    }
+    ahrs.update(imu.gyr[0]*M_PI/180, imu.gyr[1]*M_PI/180, imu.gyr[2]*M_PI/180, 
+                imu.acc[0], imu.acc[1], imu.acc[2]); 
 
-    if (pose.is_atti_init_done == false) {
-      pose.atti_init(imu.acc, imu.mag);
-    } 
-    else {
-      pose.predict(imu.gyr, imu.acc, dt);
-      pose.update_magnetic(imu.mag);
-    }
+    Quaterniond q = ahrs.quaternion(); 
+    printf("%f,%f,%f,%f\n", q.w(), q.x(), q.y(), q.z());
 
-    pose.set_timestatmp(time); 
+    // viewer.update_rotation(q.w(), q.x(), q.y(), q.z());
+    viewer.update_rotation(imu.qw, imu.qx, imu.qy, imu.qz); 
+    // viewer.update_rotation(imu.roll, imu.pitch, imu.yaw); 
 
-    Vector3d pos = pose.pos;
-    Quaterniond q = pose.q;
+    // if (pose.is_init_done == false) {
+    //   Vector3d pos = Vector3d::Zero();
+    //   Vector3d vel = Vector3d::Zero();
+    //   pose.pose_init(pos, vel);
+    // }
+
+    // if (pose.is_atti_init_done == false) {
+    //   pose.atti_init(imu.acc, imu.mag);
+    // } 
+    // else {
+    //   pose.predict(imu.gyr, imu.acc, dt);
+    //   pose.update_magnetic(imu.mag);
+    // }
+
+    // pose.set_timestatmp(time); 
+
+    // Vector3d pos = pose.pos;
+    // Quaterniond q = pose.q;
 
     // viewer.update_position(pos(0), pos(1), pos(2));
-    viewer.update_position(0, 0, 0); 
+    // viewer.update_position(0, 0, 0); 
 
-    viewer.update_orientation(q.w(), q.x(), q.y(), q.z());
     // viewer.update_orientation(imu.qw, imu.qx, imu.qy, imu.qz); 
     // viewer.update_orientation(imu.roll, imu.pitch, imu.yaw); 
 
@@ -199,7 +211,7 @@ int main(int argc, char *argv[])
       break; 
     } 
 
-    sleep(dt); 
+    usleep(dt*1000000); 
     time += dt; 
   }
 
